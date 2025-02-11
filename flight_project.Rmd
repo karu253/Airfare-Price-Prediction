@@ -1,0 +1,745 @@
+---
+title: "**Strategizing Airfare Optimization Employing Regression Analysis to Forecast Flight Ticket Prices**"
+author: "Divya Karumanchi"
+output:
+  pdf_document: default
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r get-labels, echo = FALSE}
+labs = knitr::all_labels()
+labs = setdiff(labs, c("setup", "get-labels"))
+```
+
+## 1. Introduction
+
+In the dynamic aviation industry, understanding the factors influencing flight ticket prices is crucial for airlines, travel agencies, and passengers. This analysis delves into a comprehensive dataset encompassing flight transaction details to uncover the relationships between various variables and their impact on ticket prices through regression analysis techniques. The central focus lies in identifying the key determinants of price fluctuations, such as airline, source and destination cities, travel timings, number of stops, service class, flight duration, and booking lead time.
+
+**1.1  Project Motivation and Objectives ** 
+The motivation behind this project stems from the pivotal role that flight pricing plays in the aviation sector. Accurate price analysis can empower airlines to refine their revenue strategies, enhance competitiveness, and better cater to customer demands. Furthermore, it enables travelers to make informed decisions, potentially resulting in cost savings and a more transparent booking experience.
+
+-   The core objectives of this analysis are:
+-   Analyzing the relationships between flight characteristics such as airline, travel timings, service class, and ticket prices.
+-  Understanding the impact of factors like airline preferences, number of stops, flight duration, booking lead time, and more on ticket prices.
+-  Offering valuable insights to airlines, travel agencies, and policymakers for optimizing pricing strategies and enhancing overall industry efficiency.
+
+**1.2  Data Description ** The dataset utilized for this project, sourced from Kaggle's Flight Price Prediction Dataset, represents a comprehensive repository of flight transaction data invaluable for predicting ticket prices. Encompassing a rich array of information such as airline names, flight identifiers, source and destination cities, departure and arrival times, number of stops, class of service, flight durations, days left until departure, and ticket prices, this integrated dataset serves as a foundational component for understanding the complex dynamics of flight pricing. By leveraging this dataset and employing rigorous regression analysis techniques, the analysis aims to unravel the underlying factors driving fluctuations in ticket prices and uncover meaningful relationships between variables like airline preferences, flight routes, travel timings, and service classes.
+
+  
+**1.3 Exploratory Data Analysis**
+Our initial Exploratory Data Analysis (EDA) will focus on understanding the distribution of features like departure_time, source_city, destination_city, airline, and aircraft_type. We'll then explore how these features relate to the target variable, price (ticket price).
+
+  
+***1.3.1  Evidence of Data***
+
+In the initial phase of data exploration, a preliminary examination of the first ten rows was conducted to ascertain the underlying structure of the dataset. The following excerpt presents these initial observations:
+
+```{r echo=FALSE,fig.width=5,fig.height=4}
+#1.3.1 Evidence of Data
+# Read the CSV file
+
+library(readr)
+flight <- read.csv("C:/Users/divya/Downloads/flight_filtered_data_final_ff.csv", row.names = 1)
+first_10_columns <- head(flight, n = 5)
+first_10_columns
+
+```
+**1.3.2 Variable Relationships: Visualization and Analysis**
+
+***A. Bar Chat for Key Relationships***
+
+Analyzing the average ticket prices by airline reveals Vistara as the most expensive carrier, followed closely by Air India. This bar chart provides a snapshot of average ticket prices across different airlines. The airlines are listed on the bottom axis (X-axis) while the Y-axis represents the average ticket price. The height of each bar corresponds to an airline's average price. We can see that Vistara has the tallest bar, indicating the highest average ticket price among the airlines listed. Air India follows closely behind with the second-highest average price. 
+
+
+```{r echo=FALSE}
+#1.3.2 Variable Relationships: Visualization and Analysis
+# Assuming the flight dataset is already loaded into your environment
+# Load the ggplot2 library
+library(ggplot2)
+
+ggplot(flight, aes(x = airline, y = price)) +
+  stat_summary(fun = mean, geom = "bar", fill = "aquamarine4") +
+  labs(x = "Airline", y = "Mean Price", title = "Bar Plot: Mean Price by Airline")
+
+```
+
+```{r echo=FALSE}
+#1.3.2 Variable Relationships: Visualization and Analysis
+# Assuming the flight dataset is already loaded into your environment
+# Load the ggplot2 library
+library(ggplot2)
+
+ggplot(flight, aes(x = source_city, y = price)) +
+  stat_summary(fun = mean, geom = "bar", fill = "aquamarine4") +
+  labs(x = "Airline", y = "Mean Price", title = "Bar Plot: Mean Price by Source City")
+```
+
+
+
+**B. Boxplots for Comparative Analysis**
+
+The boxplot effectively visualizes price distributions between Business and Economy classes. Business class tends to have higher prices, as indicated by its higher positioning on the y-axis compared to Economy class. Similar boxplots for departure time, stops, and arrival time show that early morning and late night flights have lower prices, flights with one stop are priced higher, and morning flights tend to have higher prices.
+```{r echo=FALSE, fig.width=6, fig.height=4}
+#1.4.2 Variable Relationships: Visualization and Analysis
+# Define the columns of interest
+Data <- read.csv("C:/Users/divya/Downloads/flight_filtered_data_final_ff.csv", row.names = 1)
+columns_of_interest <- c("departure_time", "stops", "arrival_time", "class")
+
+# Loop through each column
+for (col in columns_of_interest) {
+  # Convert stops to factor to ensure distinct levels
+  if (col == "stops") {
+    Data$stops <- factor(Data$stops)
+  }
+  
+  # Side-by-side boxplots for price by each column with non-default colors
+  boxplot(price ~ Data[[col]], data = Data, 
+          col = c("lightpink", "lavender"), xlab = col, 
+          ylab = "Price", main = paste("Boxplots of Price by", col))
+  
+  # Add a legend if there are levels
+  if (is.factor(Data[[col]]) && length(levels(Data[[col]])) > 0) {
+    legend("topright", legend = levels(Data[[col]]), fill = c("lightpink", "lavender"))
+  }
+}
+
+
+```
+
+
+**C. Histograms for Variable Insight**
+
+The histogram depicts a right-skewed distribution of flight prices, showcasing the frequency of flights within various price ranges. The most common range observed is approximately Rs.5000 - Rs.20,000, with taller bars indicating higher frequency. Flights priced below and above this range are less common, evident from the shorter bars. Overall, the histogram offers a concise overview of price distribution, emphasizing prevalent price ranges.
+
+```{r echo=FALSE, fig.width=4, fig.height=3}
+#1.4.2 Variable Relationships: Visualization and Analysis
+# Load the ggplot2 library
+library(ggplot2)
+
+# Create a histogram plot for the price variable with specified binwidth
+price_histogram <- ggplot(flight, aes(x = price)) +
+  geom_histogram(bins = 30, fill = "lavender",color="blue") +
+  labs(title = "Distribution of Prices",
+       x = "Price",
+       y = "Frequency")
+
+# Print the histogram plot
+print(price_histogram)
+```
+
+
+## 2. REGRESSION ANALYSIS
+
+**2.1 Data Preprocessing Handling Missing Values, Removing Duplicates, and Enhancing Predictors**
+ 
+  **Handling Missing Values:** Following a comprehensive evaluation of the dataset, an assessment was conducted to identify missing values across all columns. The computation involved summing the missing values for each column. The analysis revealed an absence of missing values in any column, indicating a complete dataset suitable for further examination and analysis.
+```{r echo=FALSE, eval=FALSE} 
+#2.1 Data Preprocessing Handling Missing Values, Removing Duplicates, and Enhancing Predictors
+# Check for missing values
+any(is.na(flight))
+```
+
+  **Handling Categorial Values:** :In the context of descriptive statistics, non-numeric columns were isolated to identify categorical variables. As part of data preprocessing, manual encoding was conducted on the 'arrival_time' and 'departure_time' columns to transform categorical values into their corresponding numerical counterparts. These numeric representations delineate various time intervals: 0 for early morning, 1 for morning, 2 for afternoon, 3 for evening, 4 for night, and 5 for late night, elucidating details about arrival times within each interval. Concerning the 'Class' column, it serves as a numeric indicator of seat class, with distinct values of 0 denoting Economy and 1 denoting Business, facilitating differentiation between the two classes within the dataset.
+  
+```{r echo=FALSE, eval=FALSE}
+# We have already submitted the dataset after handling the categorical values. This is just for reference.
+
+# Load necessary libraries
+#library(dplyr)
+
+# Assuming 'arrival_time' and 'departure_time' are categorical columns in your dataset
+
+# Manual encoding for 'arrival_time' column
+#flight$arrival_time <- factor(flight$arrival_time, levels = c("early morning", "morning", "afternoon", "evening", "night", "late night"))
+#flight$arrival_time <- as.integer(as.character(flight$arrival_time))
+
+# Manual encoding for 'departure_time' column
+#flight$departure_time <- factor(flight$departure_time, levels = c("early morning", "morning", "afternoon", "evening", "night", "late night"))
+#flight$departure_time <- as.integer(as.character(flight$departure_time))
+
+# Manual encoding for 'Class' column
+#flight$Class <- as.integer(flight$Class)  
+
+```
+
+By preprocessing the dataset, we have enhanced its usability by converting categorical variables into numerical representations. This refined dataset now equips us adequately to undertake an in-depth exploration of descriptive statistics and inter-variable relationships.
+
+**2.2 Variable Selection**
+
+Feature selection is a crucial step in the process of building predictive models, helping to identify the most relevant variables that contribute to the model’s performance. We are performing an exhaustive search for the best subset of features for explaining the Flight Price (price) with respect to other variables in a given dataset.
+
+**Adjusted R-squared:**
+We conducted further analysis by prioritizing the model with the highest Adjusted R-squared, considering it as a criterion for model selection. The model with 3 predictors exhibited the highest Adjusted R-squared value (0.8900948). These predictors, including intercept, price, stops, airline, days_left, class, arrival_time, departure_time, and duration, strike a balance between goodness-of-fit and model simplicity.Best Model Selected from Adjusted R2: “price,” “class,” “stops,” and “days_left,”.
+
+Best Model Selected from Adjusted R2: “price,” “class,” “stops,” and “days_left,”.
+
+**AIC:**
+We are calculating now the Akaike Information Criterion (AIC) for each model generated by the exhaustive
+search and then fitting a linear model (lm) using the predictors selected(stops +arrival_time + class + departure_time + duration + days_left)) based on the model with the minimum AIC.
+**Best Model Selected from AIC:** class + stops + days_left + duration
+
+**BIC:** We are calculating the Bayesian Information Criterion (BIC) for each model generated during the
+exhaustive search. The BIC is a criterion for model selection that penalizes model complexity.
+**Best Model Selected from BIC:** price,"stops”.
+
+```{r echo=FALSE, eval=FALSE}
+#2.2 Variable Selection
+# Load the flight data
+flight_data <- read.csv("C:/Users/divya/Downloads/flight_filtered_data_final_ff.csv", row.names = 1)
+
+##AIC forward
+mod_start1 <- lm(price ~ 1, data = flight_data)
+mod_forwd_aic1 <- step(mod_start1, scope = price ~ stops +arrival_time + class + departure_time + duration + days_left, direction = 'forward')
+coef(mod_forwd_aic1)
+
+##BIC forward
+n1 <- nrow(flight_data)
+mod_forwd_bic1 <- step(mod_start1, scope = price ~ stops, direction = 'forward', k = log(n1))
+coef(mod_forwd_bic1)
+
+# The best Forward AIC model value and its coefficients
+extractAIC(mod_forwd_aic1)
+coef(mod_forwd_aic1)
+
+# The best Forward BIC model and its coefficients
+extractAIC(mod_forwd_bic1, k = log(n1))
+coef(mod_forwd_bic1)
+
+# Create a table with each quality criterion
+criterion <- c("AIC", "BIC")
+scores <- c(AIC = extractAIC(mod_forwd_aic1)[2], BIC = extractAIC(mod_forwd_bic1, k = log(n1))[2])
+variables_chosen <- c(AIC = paste(names(coef(mod_forwd_aic1))[-1], collapse = ", "), 
+                      BIC = paste(names(coef(mod_forwd_bic1))[-1], collapse = ", "))
+question11 <- data.frame(criterion, scores, variables_chosen)
+knitr::kable(question11, "pipe", align = c("l" , "c", "c"))
+```
+```{r echo=FALSE,eval=FALSE}
+#2.2 Variable Selection
+
+## Load necessary library
+library(leaps)
+
+# Load the flight data
+flight_data <- read.csv("C:/Users/divya/Downloads/flight_filtered_data_final_ff.csv", row.names = 1)
+
+## Subset of predictors
+predictors_flight <- c("price", "stops", "airline", "days_left","class", "arrival_time", "departure_time", "duration")
+
+## Perform an exhaustive search
+mod_exhaustive_flight <- summary(regsubsets(price ~ ., data = flight_data[, predictors_flight], nvmax = 3))
+
+## Display the selected subset of features
+mod_exhaustive_flight$which
+
+## Display the residual sum of squares (RSS) for the selected models
+mod_exhaustive_flight$rss
+
+
+```
+```{r echo=FALSE,eval=FALSE}
+## Displaying the Adjusted R-squared values
+mod_exhaustive_flight$adjr2
+
+## Finding the index with the highest Adjusted R-squared value
+which.max(mod_exhaustive_flight$adjr2)
+
+## Assigning the index with the highest Adjusted R-squared value to a variable
+best_r2_ind_flight <- which.max(mod_exhaustive_flight$adjr2)
+
+## Displaying the selected subset of features for the best Adjusted R-squared
+best_features_flight <- mod_exhaustive_flight$which[best_r2_ind_flight,]
+
+## Get the number of columns in the selected subset
+p_flight <- ncol(mod_exhaustive_flight$which)
+
+mod_exhaustive_flight$which[best_r2_ind_flight,]
+```
+**Summary Table:**
+```{r echo=FALSE}
+criterion = c("Adjusted Rˆ2", "AIC", "BIC")
+scores = c("0.8900948", "35339.25", "39880.14")
+variables_chosen = c("stops, days_left, class", "class, stops, days_left, duration", "stops")
+question14 = data.frame(criterion, scores, variables_chosen)
+knitr::kable(question14, "pipe", align=c("l" , "c", "c"))
+```
+
+Based on the summary table provided, a balanced approach for model selection might involve choosing the model with the highest Adjusted R-squared value while also considering competitive AIC and BIC values. In this case, the model with variables "stops," "days_left," and "class" achieves an Adjusted R-squared value of 0.8900948, indicating good goodness of fit. Additionally, the AIC and BIC values for this model are competitive, further supporting its selection.
+
+Therefore, the selected model includes the variables "stops," "days_left," and "class." This model strikes a balance between goodness of fit and simplicity.
+To operationalize this model, a dataset containing only the selected variables and the target variable was extracted from the original dataset. This updated dataset, containing the essential variables for analysis, was saved for future use.
+
+**2.3 Model Diagnostics**
+
+**2.3.1 Check for collinearity**
+Here we will check the collinearity between the predictors (class, stops, days_left) and response variable. 
+
+```{r echo=FALSE, message=FALSE}
+#2.3.1 Check for collinearity
+dataset <- flight[, c("price", "stops", "days_left", "class") ]
+
+library(corrplot)
+corrplot(cor(dataset),
+method = 'color', order = 'hclust', diag = FALSE,
+addCoef.col = 'black', tl.pos= 'd', cl.pos ='r')
+
+```
+
+Below are the Eigen value and condition indices for the fitted model after variable selection.
+```{r echo=FALSE, message=FALSE, fig.width=4, fig.height=3}
+library(olsrr)
+
+# Fit a new model using the subsetted data
+final_model <- lm(price ~ class + stops + days_left, data = dataset)
+
+#check eigen value and condition index for the selected model
+round(ols_eigen_cindex(final_model)[, 1:2], 4)
+```
+
+The heatmap depicting the correlation matrix between the response variable price and predictors, namely 'class', 'stops', and 'days_left', reveals interesting insights. Among these predictors, 'class' and 'price' exhibit a relatively high correlation value of 0.94, indicating a strong linear relationship between them. Conversely, the correlation between 'class' and 'stops' is notably lower, suggesting less association between these variables.
+
+This observation is beneficial for the regression model, as it indicates that 'class' and 'price' provide unique information and are not strongly redundant. The relatively low correlation between 'class' and other predictors further enhances the model's interpretability, as it reduces the risk of multicollinearity. Overall, this correlation analysis aids in understanding the interplay between predictors and the response variable, thereby contributing to the robustness of the regression model.
+
+***2.3.2 Diagnostics with vif values***
+The 'flight_data' dataset was constructed. The variance inflation factors (VIFs) for key predictors, including 'stops' (VIF: 1.00958), 'days_left' (VIF: 1.000326), and 'class' (VIF: 1.000899), were all found to be close to 1. These low VIF values indicate that there is no substantial multicollinearity among these predictors, contributing to the reliability of the regression model's coefficients. Additionaly, the condition indices are all below 30 which menas we don't have to worry about multicollinearlity. 
+
+```{r echo=FALSE, message=FALSE}
+#2.3.2 Diagnostics with vif values
+# Load the car package
+library(car)
+# fit model to data
+
+vif(final_model)
+
+```
+Below is the summary for the model fitted after variable selection.
+```{r echo=FALSE}
+# Summary of the model fitted with selected variables
+summary(final_model)
+```
+***2.3.3 Diagnostics with Fitted Vs residual plot and bp test:***
+Now, we fit the plot for residuals of our final model which only has the three predictors class, days left and stops. 
+```{r echo=FALSE, message=FALSE}
+#2.3.3 Diagnostics with Fitted Vs residual plot and bp test:
+# check fitted vs residual and bp test for the model with selected variables
+library(olsrr)
+library(lmtest)
+
+ols_plot_resid_fit(final_model)
+bptest(final_model)
+```
+The fitted-vs-residuals plot does not look good. In particular, the variance tends to increase as the fitted values increase, but there is a gap between the fitted values as there are no points between 20000 to 40000. Additionally, the plot does not have linear relationship. Hence, the linearity and constant variance assumption has been violated.
+
+***2.3.4 Diagnostics with Fitted Vs residual plot and bp test:***
+Now, we perform Shapiro wilk test for the model and check normality assumption violation.
+```{r echo=FALSE}
+#perform Shapiro wilk test for the model with selected variables
+shapiro.test(resid(final_model))
+
+```
+The p-value of the Shapiro-Wilk test is < 2.2e-16. So we reject the null hypothesis and conclude that the errors are not normally distributed. So, the normality assumption has been violated.
+
+Therefore, the normality and equal variance assumptions are violated here, so we try to correct them using WLS (weighted least squares) model and performing shapiro wilk test. Also, we will be trying to check the normality distribution by removing high influential points.
+
+**2.4 Fixing Model Violations**
+Next, we will assess the constant variance assumption for the Weighted Least Squares (WLS) model by using the inverse of the squared fitted values from the model as weights, denoted as weights=1/(fitted values)^2. We will examine the constant variance assumption both graphically and through a hypothesis test at the significance level of alpha=0.05.
+
+Below is the summary for the Weighted least squares model (model_wls).
+```{r echo=FALSE}
+#2.4 Fixing Model Violations
+model_ws = lm(abs(resid(final_model)) ~ stops + days_left + class, data = dataset)
+
+# Calculate the weights as 1 / (fitted values)^2
+weights <- 1 / fitted(model_ws)^2
+
+# Run WLS
+model_wls <- lm(price ~ stops + days_left + class, data = dataset, weights = weights)
+
+# Print the model summary
+print(summary(model_wls))
+```
+***2.4.1 Checking violations using plotes and hypothesis tests***
+The fitted Vs residual plot for the WLS model is plotted here. 
+```{r echo=FALSE}
+#2.4.1 Checking violations using plotes and hypothesis tests
+# Plot fitted values vs. weighted residuals
+plot(fitted(model_wls), weighted.residuals(model_wls), 
+     pch = 16, xlab = 'Fitted Value', ylab = 'Weighted Residual')
+
+# Change the range of weighted residuals
+ylim <- c(-10, 10)  # Adjust as needed
+abline(h = 0, lwd = 3, col = 'blue')
+
+```
+In this case, the spread in the residuals appears to be roughly constant as the fitted values increase. We can also Conduct the BP test.
+
+***Studentized Breusch-Pagan Test:***  The Studentized Breusch-Pagan Test evaluates if the variance of residuals varies systematically across different predictor levels in a linear regression model. It helps detect heteroscedasticity, which can impact the reliability of regression analysis.
+
+```{r echo=FALSE}
+library(lmtest)
+shapiro.test(resid(model_wls))
+bptest(model_wls)
+```
+In this case, the p-value is very large (p-value = 1), so we do not reject the null hypothesis that the errors are homoscedastic. Hence, we conclude that the constant variance assumption has not been violated for the weighted residuals. 
+
+Now, we can check the normality distribution for the WLS model by plotting the QQ plot and histogram of residuals.
+
+***Q-Q Plot:***
+The Q_Q plot shows the distribution of residuals for a weighted least squared regression model named model_wls. The plot does not look good and it suggests that the data is not normally distributed. 
+
+```{r echo=FALSE, fig.width=4, fig.height=3}
+ols_plot_resid_qq(model_wls)
+```
+For further analysis, we'll identify and remove high leverage points, outliers, and influential observations from the data if required, to assess whether the violations of the LINE assumptions are mitigated.
+
+**2.5 Finding High Leverage points, Outliers, and Inflential Observations**
+
+-   ***High Leverage Points:***
+About 4.45% high leverage points, ranging from indices 3 to 1999, were detected using a threshold of 2 times the mean of the hat values. These points can substantially influence the estimated coefficients in the regression model, necessitating further investigation into their impact on model fit. Sensitivity checks can help evaluate the robustness of the regression results with and without these influential data points.
+```{r echo=FALSE}
+#2.5 Finding High Leverage points, Outliers, and Inflential Observations
+
+high_lev_ids <- which(hatvalues(model_wls) > 2 * mean(hatvalues(model_wls)))
+
+# Viewing the indices of high leverage points
+high_lev_ids
+
+```
+
+-   ***Outliers:***
+The residual analysis revealed eighteen observations, with indices 103, 802, 908, 1075, 1210, 1313, 1499, 1509, 1696, 1998, 104, 803, 909, 1076, 1211, 1314, 1500, 1510, 1697 and 1999, identified as outliers based on the test. Outliers, as determined by their studentized residuals exceeding the calculated threshold, can significantly impact the regression model’s assumptions and overall fit.
+```{r echo=FALSE}
+outlier_test_cutoff = function(model, alpha = 0.05) {
+    n = length(resid(model))
+    qt(alpha/(2 * n), df = df.residual(model) - 1, lower.tail = FALSE)
+}
+
+# vector of indices for observations deemed outliers.
+cutoff = outlier_test_cutoff(model_wls, alpha = 0.05)
+
+which(abs(rstudent(model_wls)) > cutoff)
+```
+
+-   ***High Inflential Points:***
+The examination using Cook’s distance revealed that 5.55% of the entire dataset, corresponding to indices ranging from 3 to 1999, comprises influential points within the regression model. These specific data points wield a substantial influence on the outcomes of the regression, potentially exerting considerable effects on both the estimated coefficients and the overall model fit.
+```{r echo=FALSE}
+
+high_inf_ids <- which(cooks.distance(model_wls) > 4 / length(cooks.distance(model_wls)))
+print(high_inf_ids)
+```
+
+**2.5.1 Handling High Leverage Points, Outliers, and Influential Observations:** 
+The model, constructed with predictors selected through an exhaustive search on the dataset, underwent a thorough refinement process to address influential points, high-leverage points, and outliers. This meticulous approach aimed to enhance the robustness of the final model (model_wls).
+
+Upon reviewing the summary output of the model:
+The adjusted model notably improves with an Adjusted R-squared of 0.8633. A highly significant p-value (< 2.2e-16) underscores the statistical significance of observed relationships, though further refinement is needed for deeper insights into price fluctuations.
+```{r echo=FALSE}
+#2.5.1 Handling High Leverage Points, Outliers, and Influential Observations:
+noninfluential_ids = which(
+    cooks.distance(model_wls) <= 4 / length(cooks.distance(model_wls)))
+
+# fit the model on non-influential subset
+model_fix = lm(price ~ stops + days_left + class, data = dataset, weights = weights,
+               subset = noninfluential_ids)
+
+# return coefficients
+summary(model_fix)
+```
+
+**2.6 Assessment of Violations in WLS Model after Removing High Influential Points:**
+
+In this section, we focus on the model_fix, where we applied Weighted Least Squares (WLS) and removed highly influential points. We will reevaluate potential violations in this model through plots and hypothesis tests.
+
+```{r echo=FALSE, fig.width=4, fig.height=3}
+ols_plot_resid_fit(model_fix)
+ols_plot_resid_qq(model_fix)
+bptest(model_fix)
+#install.packages("lmtest")
+shapiro.test(resid(model_fix))
+```
+Even though,after removing high influential points. there is no much difference in the qq plot compared with the previous qq plot. hence normality assumption is violated
+
+The graph still doesn't look good. Even though there is not a lot of data for large fitted values, it still seems clear that the constant variance assumption is not violated. In addition, the residuals for small fitted values suggest that the regression relationship may not be linear.
+
+Overall, we conclude that the errors are not normally distributed and the constant variance is not violated  and linearity assumptions are violated.
+
+
+**2.7 Transformations:**
+
+Here, we use the Box-Cox method to determine an appropriate transformation of the response. Which would return the value of λ^ as well as the plot returned by the boxcox function.
+To search for an appropriate transformation of the response, we use the Box-Cox method. We identify an appropriate value of λ using the boxcox function from the MASS package. The default range of λ ranging from -2 to 2 makes it hard to visualize the CI for λ. Specifying a custom range of -0.25, to 0.75 makes the plot much more legible.
+To search for an appropriate transformation of the response, we use the Box-Cox method. We identify an appropriate value of λ using the boxcox function.
+```{r echo=FALSE, fig.width=4, fig.height=3}
+#2.7 Transformations
+# Load the dplyr package
+library(dplyr)
+# Load the caret package
+library(caret)
+
+# Box-Cox transformation
+# Load necessary library
+library(corrplot)
+
+library(MASS)
+
+
+bc = boxcox(model_fix, lambda = seq(-0.25, 0.75, by = 0.05), plotit = TRUE)
+```
+Now, we extract the λ value that maximizes the log-likelihood. 
+
+```{r echo=FALSE}
+lambda <- bc$x[which.max(bc$y)]
+cat('The best λ value is :', lambda)
+```
+
+According to the boxcox plot from above, the 95% confidence interval for λ contains λ = 0.275. Therefore, we are justified in using the transformation $price^{0.275}$.
+```{r echo=FALSE}
+get_lambda_ci = function(bc, level = 0.95) {
+    # lambda such that 
+    # L(lambda) > L(hat(lambda)) - 0.5 chisq_{1, alpha}
+    CI_values = bc$x[bc$y > max(bc$y) - qchisq(level, 1)/2]
+    
+    # 95 % CI 
+    CI <- range(CI_values) 
+    
+    # label the columns of the CI
+    names(CI) <- c("lower bound","upper bound")
+    
+    CI
+}
+
+# extract the 95% CI from the box cox object
+get_lambda_ci(bc)
+```
+In this case, the 95% CI is ( 0.2550505,  0.3055556 ), which clearly contains  λ = 0.275
+
+***2.7.1 Perform regression analysis and fit a transformed model:***
+Perform OLS regression with $price^{0.275}$ as the response and class, stops, days_left as the predictors.The summary fo the new transformed model (model_bc) is given below.
+```{r echo=FALSE}
+#2.7.1 Perform regression analysis and fit a transformed model:
+
+# unlike the predictors, raising the response to a power is not a problem
+
+# though the model is new with the response variable raising to the power 0.275(best lambda value), we are using the "dataset" with our selected variables (stops, class, days_left) and  using the old model's predictors only but not all predictors.
+
+model_bc = lm(price ^ 0.275 ~ ., data = dataset)
+model_bc 
+
+summary(model_bc)
+```
+
+
+***2.7.2 Assessment of Final Model (model_bc) Residuals:***
+
+For the final model_bc derived after transformation, we examine the Fitted vs. Residual plot and QQ plot. Subsequently, we conduct the Shapiro-Wilk test to assess violations of equal variance and normality assumptions.
+```{r echo=FALSE}
+#2.7.2 Assessment of Final Model (model_bc) Residuals:
+ols_plot_resid_fit(model_bc)
+ols_plot_resid_qq(model_bc)
+```
+
+
+ 
+***Shapiro-Wilk Normality Test:*** The flight model's residuals underwent a Shapiro-Wilk test to evaluate their normal distribution assumption. The test, which compares the residuals against the null hypothesis of normality, yielded a Shapiro-Wilk statistic (W) of 0.99755 and a p-value is 0.003311. A low p-value indicates normality violation.
+
+```{r echo=FALSE}
+shapiro.test(resid(model_bc))
+
+```
+
+Although the p-value of the Shapiro-Wilk test indicates non-normality, the QQ plot for the model displays a satisfactory fit. Thus, despite the lower p-value, the normality assumption appears to be better supported for this model compared to previous ones in this analysis.
+
+```{r echo=FALSE}
+bptest(model_bc)
+```
+
+## 3. DISCUSSIONS:
+***3.1 Discussion on Model Diagnosis and Transformation:***
+We began by employing variable selection techniques, including AIC, BIC, and Adjusted R-squared, using the forward method. However, we encountered violations of linearity, constant variance, and normality assumptions, despite no significant multicollinearity issues detected through VIF analysis.
+
+To address these concerns, we applied a Weighted Least Squares (WLS) model and conducted diagnostic tests, such as fitted vs. residual and QQ plots. Initially, the Breusch-Pagan test suggested homoscedasticity, but we found persistent deviations from normality even after addressing outliers, high leverage points, and influential observations.
+
+Implementing the Box-Cox transformation noticeably improved normality, enhancing the QQ plot. However, the Shapiro-Wilk test still indicated a departure from normality. Surprisingly, the Breusch-Pagan test revealed a violation of the constant variance assumption, despite improved alignment in the fitted vs. residual plot, potentially indicating a better model fit.
+
+***3.2 Summary of Model Evaluation and Hypothesis Testing:***
+
+
+| Model                                                            | R2     | P value of BP test   | P value of Shapirowilk test  | 
+|------------------------------------------------------------------|--------|----------------------|------------------------------|
+| Adjusted R square model (final_model)                            | 0.8967 | < 2.2e-16            | < 2.2e-16                    |
+| Weighted Least squares model (model_wls)                         | 0.7935 | 1                    | < 2.2e-16                    |
+| WLS Model after removing highly influential points (model_fix)   | 0.8633 | 1                    | < 2.2e-16                    |
+| The model after transformation (model_bc)                        | 0.9081 | 1.625e-05            | 0.003311                     |
+
+After conducting a series of analyses to address model robustness, we focused on improving LINE assumptions. Ultimately, the model_bc, derived after Box-Cox transformation, emerged as the most enhanced. Despite a slight decrease in the p-value of the Breusch-Pagan test, this model exhibited the highest R-squared value (0.9081) and notably improved p-values from the Shapiro-Wilk test (0.003311). Visually, both the fitted vs. residual and QQ plots for the model_bc appeared favorable, affirming its overall superiority.
+
+We performed hypothesis tests on the final model (model_bc) by examining test statistics and p-values for each predictor's effect on the response variable. The results and conclusions from the t-tests for each predictor are outlined below.
+
+**3.3 Hypothesis Testing Results for Predictors in the Final Model (model_bc)**
+
+- ***stops:***
+Null hypothesis (H0): The coefficient for stops is zero.
+Alternative hypothesis (H1): The coefficient for stops is not zero.
+The p-value for stops is < 2e-16, indicating that stops is highly statistically significant.
+- ***days_left:***
+Null hypothesis (H0): The coefficient for days_left is zero.
+Alternative hypothesis (H1): The coefficient for days_left is not zero.
+The p-value for days_left is < 2e-16, indicating that days_left is highly statistically significant.
+- ***class:***
+Null hypothesis (H0): The coefficient for class is zero.
+Alternative hypothesis (H1): The coefficient for class is not zero.
+The p-value for class is < 2e-16, indicating that class is highly statistically significant.
+```{r echo=FALSE, eval=FALSE}
+#3.3 Hypothesis Testing Results for Predictors in the Final Model (model_bc)
+summary(model_bc)
+```
+**3.3.1 Hypothesis Testing: Relationship between Response Variable (Price) and each Predictor seperately(Stops, Class, Days_Left)**
+
+Now, we can perform the hypothesis tests to check the significant relationship between response variable (price) and rest of the predictors (stops, class, days_left)
+```{r echo=FALSE, eval=FALSE}
+#3.3.1 Hypothesis Testing: Relationship between Response Variable (Price) and each Predictor seperately(Stops, Class, Days_Left)
+model1 = lm(price ~ stops, data = Data)
+summary(model1)
+```
+Based on model 1 (simple linear regression model between price and stops), the interpretation is : 
+The Null Hypothesis: The 𝐻0:𝛽1 = 0 suggests that there is no significant relationship between the number of stops and the price. The Alternate Hypothesis: The 𝐻1:𝛽1 ≠ 0 indicates that there is a significant relationship between the number of stops and the price.
+
+The test statistic is calculated as t = βˆ1/SE[βˆ1], which equals 4.025 in this case. The p-value of the test is 5.92e-05.
+At a significance level of α = 0.05, the p-value for the coefficient of "stops" is less, leading to rejection of the null hypothesis. This signifies a significant linear relationship between the number of stops and the price. Thus, we conclude that the number of stops has a statistically significant effect on the price, satisfying all linear regression assumptions.
+
+```{r echo=FALSE, eval=FALSE}
+model2 = lm(price ~ days_left, data = Data)
+summary(model2)
+```
+Based on model 2 (simple linear regression model between price and days_left), the interpretation is : 
+For the simple linear regression model between price and days_left, the test statistic is -4.051 with a p-value of 5.3e-05. At a significance level of α = 0.05, the p-value is less, leading to rejection of the null hypothesis, indicating a significant linear relationship between days_left and price. Thus, days_left has a statistically significant effect on price, satisfying all linear regression assumptions.
+
+```{r echo=FALSE, eval=FALSE}
+model3 = lm(price ~ class, data = Data)
+summary(model3)
+```
+
+Based on model 3 (simple linear regression model between price and class), the interpretation is : 
+
+The Null Hypothesis: The 𝐻0:𝛽1 = 0 suggests that there is no significant relationship between the class and the price. The Alternate Hypothesis: The 𝐻1:𝛽1 ≠ 0 indicates that there is a significant relationship between the class and the price.
+The test statistic is calculated as t = βˆ1/SE[βˆ1], which equals 119.26 in this case.The p-value of the test is < 2.2e-16.
+At α = 0.05, the p-value for the coefficient of "class" is significantly lower, leading to the rejection of the null hypothesis. This implies a significant linear relationship between the class and the price. Therefore, in the context of the problem, we conclude that the class indeed has a statistically significant effect on the price, satisfying all linear regression assumptions.
+**3.4 Analysis of Flight Characteristics and Ticket Prices:**
+
+We examined added variable plots for each predictor in the final model (model_bc), including stops, class, and days_left, to analyze their impact on ticket prices.
+
+```{r echo=FALSE}
+#3.4 Analysis of Flight Characteristics and Ticket Prices:
+ols_plot_added_variable(model_bc)
+```
+
+```{r echo=FALSE}
+plot(price ~ stops, data = dataset, pch = 20, col = 'grey')
+plot(price ~ class, data = dataset, pch = 20, col = 'grey')
+plot(price ~ days_left, data = dataset, pch = 20, col = 'grey')
+```
+After meticulous data preparation and model refinement, we conducted hypothesis tests and examined added variable plots for each predictor in the final model.
+
+Our analysis revealed significant relationships between flight characteristics and ticket prices. Specifically, we observed a linear increase in flight prices with an increase in class and stops, indicating higher fares for premium services and longer routes. Conversely, the number of days left before the flight displayed a negative slope, suggesting that prices tend to decrease as the departure date approaches. 
+
+These findings provide valuable insights into the pricing dynamics of airline tickets and underscore the importance of considering various factors in pricing strategies. By understanding these relationships, airlines and travel agencies can make informed decisions to optimize pricing structures and enhance customer satisfaction.
+
+## 4. Limitations
+
+-  ***Categorical Columns Not Included:*** The omission of categorical columns in the model represents a significant limitation, affecting the model's accuracy and interpretability.
+-  ***Assumption Limitations:*** Despite efforts to address linearity and constant variance, residual normality concerns persist, indicating potential unaccounted factors or data complexities.
+-  ***Model Fit Considerations:*** The Box-Cox transformation improved normality but introduced constant variance issues, underscoring the challenge of balancing multiple assumptions. Further assessment, such as cross-validation, is needed for comprehensive model evaluation.
+
+
+## 5. Conclusion
+
+In this comprehensive analysis of flight ticket pricing dynamics, we aimed to uncover the underlying factors influencing ticket prices and provide valuable insights for industry stakeholders. By employing regression analysis techniques and hypothesis testing, we identified significant relationships between various flight characteristics and ticket prices.
+
+Our investigation revealed that factors such as service class, number of stops, and days left before the flight significantly impact ticket prices. Premium services and longer routes were associated with higher fares, while ticket prices tended to decrease as the departure date approached. These findings underscore the complex interplay between supply and demand dynamics in the aviation industry.
+
+Throughout our analysis, we encountered and addressed several challenges, including violations of linearity, constant variance, and residual normality assumptions. Despite efforts to mitigate these issues through model refinement techniques such as Weighted Least Squares and Box-Cox transformation, residual normality concerns persisted. The omission of categorical columns in the model further limited its accuracy and interpretability.
+
+In conclusion, our analysis provides valuable insights into the intricate pricing dynamics of airline tickets. While our model offers a significant improvement in understanding the relationships between flight characteristics and ticket prices, further research and refinement are needed to address the remaining limitations. By continuing to explore and refine pricing models, airlines, travel agencies, and policymakers can make informed decisions to optimize pricing strategies and enhance the overall efficiency and competitiveness of the aviation industry.
+
+
+## 6. Additional work :
+
+Furthermore, we conducted an additional assessment for high leverage points, outliers, and highly influential points on the final model obtained after the Box-Cox transformation. Upon identifying and removing the highly influential points, we refitted the model to evaluate if its robustness improved.
+
+```{r echo=FALSE, eval=FALSE}
+#6.1 Additional work - checking high influential points again and removing them to fit and check for a better model
+
+high_lev_ids <- which(hatvalues(model_bc) > 2 * mean(hatvalues(model_bc)))
+
+# Viewing the indices of high leverage points
+high_lev_ids
+
+```
+```{r echo=FALSE, eval=FALSE}
+#Function for outliers
+outlier_test_cutoff = function(model, alpha = 0.05) {
+    n = length(resid(model))
+    qt(alpha/(2 * n), df = df.residual(model) - 1, lower.tail = FALSE)
+}
+
+# vector of indices for observations deemed outliers.
+cutoff = outlier_test_cutoff(model_bc, alpha = 0.05)
+
+which(abs(rstudent(model_bc)) > cutoff)
+```
+```{r echo=FALSE, eval=FALSE}
+high_inf_ids <- which(cooks.distance(model_bc) > 4 / length(cooks.distance(model_bc)))
+print(high_inf_ids)
+```
+
+- Handling High Leverage Points, Outliers, and Influential Observations: 
+Following the identification of high influential points, we excluded them from the dataset and refitted the model (model_fix_bc).
+```{r echo=FALSE, eval=FALSE}
+noninfluential_ids_bc = which(
+    cooks.distance(model_bc) <= 4 / length(cooks.distance(model_bc)))
+
+# fit the model on non-influential subset
+model_fix_bc = lm(price ~ stops + days_left + class, data = dataset, weights = weights,
+               subset = noninfluential_ids_bc)
+
+# return coefficients
+summary(model_fix_bc)
+```
+
+For the fitted model (model_fix_bc), we conducted Shapiro-Wilk tests, residual vs. fitted plots, and QQ plots. However, the results showed no significant improvement, indicating persistent issues with model diagnostics.
+```{r echo=FALSE, eval=FALSE, fig.width=4, fig.height=3}
+shapiro.test(resid(model_fix_bc))
+ols_plot_resid_fit(model_fix_bc)
+ols_plot_resid_qq(model_fix_bc)
+```
+
+Based on the plot, it's evident that the model's performance hasn't significantly improved, with continued violations of the equal variance and normality assumptions. In comparison, the model after Box-Cox transformation without removing high influential points exhibited better performance. This indicates that the step of removing high influential points did not positively impact the model's robustness.
+
+
+- Robust Regression: Furthermore, we explored a robust regression model using IRWLS with a limit of 100 iterations. However, examination of the QQ plots and fitted vs. residuals plot revealed that the model did not meet the necessary assumptions. Consequently, we opted not to utilize this regression model due to its inadequate performance in addressing the violations of variance and normality.
+
+```{r echo=FALSE, fig.width=4, fig.height=3}
+library(MASS)
+
+# IRWLS with a limit of 100 iterations.
+model_hub = rlm(price ~ stops + class + days_left, maxit = 100, data = dataset)
+
+summary(model_hub)
+
+shapiro.test(resid(model_hub))
+ols_plot_resid_fit(model_hub)
+ols_plot_resid_qq(model_hub)
+```
+
+
+
+## Code Appendix
+
+```{r all-code, ref.label=labs, eval=FALSE}
+
+```
